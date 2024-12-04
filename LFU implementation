@@ -1,0 +1,114 @@
+struct Node {
+    int key, value, cnt;
+    Node* prev;
+    Node* next;
+    Node(int key, int value) {
+        this->key = key;
+        this->value = value;
+        this->cnt = 1;
+        this->prev = nullptr;
+        this->next = nullptr;
+    }
+};
+
+struct List {
+    int size_;
+    Node* head;
+    Node* tail;
+
+    List() {
+        head = new Node(0, 0); // Dummy head
+        tail = new Node(0, 0); // Dummy tail
+        head->next = tail;
+        tail->prev = head;
+        size_ = 0;
+    }
+
+    void add_Node(Node* node) {
+        node->next = head->next;
+        node->prev = head;
+        head->next->prev = node;
+        head->next = node;
+        size_++;
+    }
+
+    void delete_Node(Node* node) {
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+        size_--;
+    }
+};
+
+class LFUCache {
+public:
+    map<int, Node*> reference_map; 
+    map<int, List*> DLL_mp;       
+    int cur_size;
+    int min_freq;
+    int capacity;
+
+    LFUCache(int capacity) {
+        this->capacity = capacity;
+        this->cur_size = 0;
+        this->min_freq = 0;
+    }
+
+    void update_all(Node* node) {
+        int freq = node->cnt;
+        DLL_mp[freq]->delete_Node(node);
+
+        // If the list of the current frequency is empty and it was the minimum frequency, increment min_freq
+        if (DLL_mp[freq]->size_ == 0 && freq == min_freq) {
+            min_freq++;
+        }
+
+        node->cnt++; // Increment frequency
+        if (DLL_mp.find(node->cnt) == DLL_mp.end()) {
+            DLL_mp[node->cnt] = new List();
+        }
+        DLL_mp[node->cnt]->add_Node(node); // Add node to the next frequency list
+    }
+
+    int get(int key) {
+        if (reference_map.find(key) == reference_map.end()) {
+            return -1;
+        }
+
+        Node* node = reference_map[key];
+        int result = node->value;
+        update_all(node); // Update frequency of the node
+        return result;
+    }
+
+    void put(int key, int value) {
+        if (capacity == 0) return;
+
+        if (reference_map.find(key) != reference_map.end()) {
+            // Key exists, update value and frequency
+            Node* node = reference_map[key];
+            node->value = value;
+            update_all(node);
+        } else {
+            // Key does not exist
+            if (cur_size == capacity) {
+                // Remove the least frequently used node
+                List* list = DLL_mp[min_freq];
+                Node* lru_node = list->tail->prev; // Least recently used node
+                reference_map.erase(lru_node->key); // Remove from map
+                list->delete_Node(lru_node);       // Remove from list
+                delete lru_node;                  // Free memory
+                cur_size--;
+            }
+
+            // Insert new node
+            Node* new_node = new Node(key, value);
+            reference_map[key] = new_node;
+            if (DLL_mp.find(1) == DLL_mp.end()) {
+                DLL_mp[1] = new List();
+            }
+            DLL_mp[1]->add_Node(new_node); // Add to frequency 1 list
+            min_freq = 1;                  // Reset min_freq to 1
+            cur_size++;
+        }
+    }
+};
